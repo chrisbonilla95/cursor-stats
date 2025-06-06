@@ -143,12 +143,12 @@ export async function checkForUpdates(lastReleaseCheck: number, RELEASE_CHECK_IN
 					};
 					
 					showChangelogWebview(release, releaseInfo.latestVersion);
-				} else {
-					log('[GitHub] Changelog disabled by user setting, skipping webview');
-				}
 
-				// Show a small notification that there's an update, but don't ask for action
-				vscode.window.showInformationMessage(message);
+					// Show a small notification that there's an update, but don't ask for action
+					vscode.window.showInformationMessage(message);
+				} else {
+					log('[GitHub] Update notifications disabled by user setting, skipping changelog and notification');
+				}
 			} else {
 				log(`[GitHub] Changelog for version ${releaseInfo.latestVersion} has already been shown`);
 			}
