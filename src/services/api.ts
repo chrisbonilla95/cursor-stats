@@ -15,7 +15,7 @@ import * as fs from 'fs';
 export async function getCurrentUsageLimit(token: string): Promise<UsageLimitResponse> {
   try {
     const response = await axios.post(
-      'https://www.cursor.com/api/dashboard/get-hard-limit',
+      'https://cursor.com/api/dashboard/get-hard-limit',
       {}, // empty JSON body
       {
         headers: {
@@ -37,7 +37,7 @@ export async function setUsageLimit(
 ): Promise<void> {
   try {
     await axios.post(
-      'https://www.cursor.com/api/dashboard/set-hard-limit',
+      'https://cursor.com/api/dashboard/set-hard-limit',
       {
         hardLimit,
         noUsageBasedAllowed,
@@ -97,7 +97,7 @@ async function fetchMonthData(
       }
     } else {
       response = await axios.post(
-        'https://www.cursor.com/api/dashboard/get-monthly-invoice',
+        'https://cursor.com/api/dashboard/get-monthly-invoice',
         {
           month,
           year,
@@ -351,7 +351,7 @@ export async function fetchCursorStats(token: string): Promise<CursorStats> {
       log('[API] Successfully extracted team member usage data');
     } else {
       const premiumResponse = await axios.get<CursorUsageResponse>(
-        'https://www.cursor.com/api/usage',
+        'https://cursor.com/api/usage',
         {
           params: { user: userId },
           headers: {
@@ -424,7 +424,7 @@ export async function fetchCursorStats(token: string): Promise<CursorStats> {
 
 export async function getStripeSessionUrl(token: string): Promise<string> {
   try {
-    const response = await axios.get('https://www.cursor.com/api/stripeSession', {
+    const response = await axios.get('https://cursor.com/api/stripeSession', {
       headers: {
         Cookie: `WorkosCursorSessionToken=${token}`,
       },

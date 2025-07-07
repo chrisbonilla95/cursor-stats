@@ -99,7 +99,7 @@ export async function checkTeamMembership(
     log('[Team] Cache miss or invalid, fetching fresh usage data');
     const tokenUserId = token.split('%3A%3A')[0];
     log('[Team] Making request to /api/usage endpoint');
-    const usageResponse = await axios.get<CursorUsageResponse>('https://www.cursor.com/api/usage', {
+    const usageResponse = await axios.get<CursorUsageResponse>('https://cursor.com/api/usage', {
       params: { user: tokenUserId },
       headers: {
         Cookie: `WorkosCursorSessionToken=${token}`,
@@ -115,7 +115,7 @@ export async function checkTeamMembership(
     // Fetch team membership data
     log('[Team] Making request to /api/dashboard/teams endpoint');
     const response = await axios.post<TeamInfo>(
-      'https://www.cursor.com/api/dashboard/teams',
+      'https://cursor.com/api/dashboard/teams',
       {}, // empty JSON body
       {
         headers: {
@@ -139,7 +139,7 @@ export async function checkTeamMembership(
       // Fetch team details to get userId
       log('[Team] Making request to /api/dashboard/team endpoint');
       const teamResponse = await axios.post<TeamMemberInfo>(
-        'https://www.cursor.com/api/dashboard/team',
+        'https://cursor.com/api/dashboard/team',
         { teamId },
         {
           headers: {
@@ -191,7 +191,7 @@ export async function getTeamUsage(token: string, teamId: number): Promise<TeamU
   try {
     log('[Team] Making request to get team usage');
     const response = await axios.post<TeamUsageResponse>(
-      'https://www.cursor.com/api/dashboard/get-team-usage',
+      'https://cursor.com/api/dashboard/get-team-usage',
       { teamId }, // Include teamId in request body
       {
         headers: {

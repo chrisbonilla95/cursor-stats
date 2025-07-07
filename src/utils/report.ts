@@ -95,7 +95,7 @@ export async function generateReport(): Promise<{ reportPath: string; success: b
 
       // Get premium usage directly
       axios
-        .get<CursorUsageResponse>('https://www.cursor.com/api/usage', {
+        .get<CursorUsageResponse>('https://cursor.com/api/usage', {
           params: { user: userId },
           headers: { Cookie: `WorkosCursorSessionToken=${token}` },
         })
@@ -144,7 +144,7 @@ export async function generateReport(): Promise<{ reportPath: string; success: b
       // Get current month invoice data
       axios
         .post(
-          'https://www.cursor.com/api/dashboard/get-monthly-invoice',
+          'https://cursor.com/api/dashboard/get-monthly-invoice',
           {
             month: usageBasedCurrentMonth,
             year: usageBasedCurrentYear,
@@ -171,7 +171,7 @@ export async function generateReport(): Promise<{ reportPath: string; success: b
       // Get last month invoice data
       axios
         .post(
-          'https://www.cursor.com/api/dashboard/get-monthly-invoice',
+          'https://cursor.com/api/dashboard/get-monthly-invoice',
           {
             month: usageBasedLastMonth,
             year: usageBasedLastYear,
