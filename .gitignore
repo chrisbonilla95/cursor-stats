@@ -4,11 +4,13 @@ node_modules
 .vscode-test/
 .DS_Store
 .env
-*.log 
-builds/
+*.log
 .git/
 *.ps1
 user-cache.json
 currency-rates.json
 .cursorignore
 package-lock.json
+har-files/
+CLAUDE.md
+cursor-stats-report*

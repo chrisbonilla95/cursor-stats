@@ -72,99 +72,102 @@ export async function checkGitHubRelease(): Promise<ReleaseCheckResult | null> {
   }
 }
 
-export async function checkForUpdates(
-  lastReleaseCheck: number,
-  RELEASE_CHECK_INTERVAL: number,
-  specificVersion?: string,
-): Promise<void> {
-  try {
-    const context = getExtensionContext();
+export async function checkForUpdates(lastReleaseCheck: number, RELEASE_CHECK_INTERVAL: number, specificVersion?: string): Promise<void> {
+	try {
+		const context = getExtensionContext();
+		
+		if (specificVersion) {
+			// Check if changelog should be shown when explicitly requested on update
+			const showChangelogOnUpdate = vscode.workspace.getConfiguration('cursorStats').get('showChangelogOnUpdate', false);
+			
+			if (!showChangelogOnUpdate) {
+				log(`[GitHub] Changelog for specific version ${specificVersion} disabled by user setting`);
+				return;
+			}
+			
+			// Show changelog for specific version
+			log(`[GitHub] Showing changelog for specific version: ${specificVersion}`);
+			const versionQuery = specificVersion.startsWith('v') ? specificVersion : `v${specificVersion}`;
+			
+			const response = await axios.get(`https://api.github.com/repos/dwtexe/cursor-stats/releases/tags/${versionQuery}`);
+			const release: GitHubRelease = response.data;
+			
+			if (!release) {
+				log(`[GitHub] No release found for version ${specificVersion}`);
+				return;
+			}
+			
+			// Show changelog directly
+			showChangelogWebview(release, specificVersion);
+			return;
+		}
+		
+		// Normal update check flow
+		const now = Date.now();
+		if (now - lastReleaseCheck < RELEASE_CHECK_INTERVAL) {
+			log('[GitHub] Skipping update check - too soon since last check');
+			return;
+		}
 
-    if (specificVersion) {
-      // Show changelog for specific version
-      log(`[GitHub] Showing changelog for specific version: ${specificVersion}`);
-      const versionQuery = specificVersion.startsWith('v')
-        ? specificVersion
-        : `v${specificVersion}`;
 
-      const response = await axios.get(
-        `https://api.github.com/repos/dwtexe/cursor-stats/releases/tags/${versionQuery}`,
-      );
-      const release: GitHubRelease = response.data;
+		lastReleaseCheck = now;
+		const releaseInfo = await checkGitHubRelease();
 
-      if (!release) {
-        log(`[GitHub] No release found for version ${specificVersion}`);
-        return;
-      }
+		if (releaseInfo?.hasUpdate) {
+			// Check if changelog should be shown on update
+			const showChangelogOnUpdate = vscode.workspace.getConfiguration('cursorStats').get('showChangelogOnUpdate', false);
+			
+			// Get previously shown changelogs
+			const shownChangelogs: string[] = context.globalState.get(SHOWN_CHANGELOGS_KEY, []);
+			
+			// Check if this version's changelog has been shown before
+			if (!shownChangelogs.includes(releaseInfo.latestVersion)) {
+				const releaseType = releaseInfo.isPrerelease ? t('github.preRelease') : t('github.stableRelease');
+				const message = t('github.updateAvailable', { 
+					releaseType: releaseType, 
+					releaseName: releaseInfo.releaseName, 
+					currentVersion: releaseInfo.currentVersion 
+				});
+				log(`[GitHub] Showing update notification: ${message}`);
 
-      // Show changelog directly
-      showChangelogWebview(release, specificVersion);
-      return;
-    }
+				if (showChangelogOnUpdate) {
+					// Show changelog directly without asking
+					log('[GitHub] Showing changelog webview...');
+					
+					// Create the GitHub release object from releaseInfo
+					const release: GitHubRelease = {
+						tag_name: `v${releaseInfo.latestVersion}`,
+						name: releaseInfo.releaseName,
+						body: releaseInfo.releaseNotes,
+						html_url: releaseInfo.releaseUrl,
+						prerelease: releaseInfo.isPrerelease,
+						zipball_url: releaseInfo.zipballUrl,
+						tarball_url: releaseInfo.tarballUrl,
+						assets: releaseInfo.assets.map(asset => ({
+							name: asset.name,
+							browser_download_url: asset.downloadUrl
+						}))
+					};
+					
+					showChangelogWebview(release, releaseInfo.latestVersion);
 
-    // Normal update check flow
-    const now = Date.now();
-    if (now - lastReleaseCheck < RELEASE_CHECK_INTERVAL) {
-      log('[GitHub] Skipping update check - too soon since last check');
-      return;
-    }
-
-    lastReleaseCheck = now;
-    const releaseInfo = await checkGitHubRelease();
-
-    if (releaseInfo?.hasUpdate) {
-      // Get previously shown changelogs
-      const shownChangelogs: string[] = context.globalState.get(SHOWN_CHANGELOGS_KEY, []);
-
-      // Check if this version's changelog has been shown before
-      if (!shownChangelogs.includes(releaseInfo.latestVersion)) {
-        const releaseType = releaseInfo.isPrerelease
-          ? t('github.preRelease')
-          : t('github.stableRelease');
-        const message = t('github.updateAvailable', {
-          releaseType: releaseType,
-          releaseName: releaseInfo.releaseName,
-          currentVersion: releaseInfo.currentVersion,
-        });
-        log(`[GitHub] Showing update notification: ${message}`);
-
-        // Show changelog directly without asking
-        log('[GitHub] Showing changelog webview...');
-
-        // Create the GitHub release object from releaseInfo
-        const release: GitHubRelease = {
-          tag_name: `v${releaseInfo.latestVersion}`,
-          name: releaseInfo.releaseName,
-          body: releaseInfo.releaseNotes,
-          html_url: releaseInfo.releaseUrl,
-          prerelease: releaseInfo.isPrerelease,
-          zipball_url: releaseInfo.zipballUrl,
-          tarball_url: releaseInfo.tarballUrl,
-          assets: releaseInfo.assets.map((asset) => ({
-            name: asset.name,
-            browser_download_url: asset.downloadUrl,
-          })),
-        };
-
-        showChangelogWebview(release, releaseInfo.latestVersion);
-
-        // Show a small notification that there's an update, but don't ask for action
-        vscode.window.showInformationMessage(message);
-      } else {
-        log(`[GitHub] Changelog for version ${releaseInfo.latestVersion} has already been shown`);
-      }
-    }
-  } catch (error: any) {
-    log(`[GitHub] Error checking for updates: ${error.message}`, true);
-    log(
-      `[GitHub] Error details: ${JSON.stringify({
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      })}`,
-      true,
-    );
-  }
+					// Show a small notification that there's an update, but don't ask for action
+					vscode.window.showInformationMessage(message);
+				} else {
+					log('[GitHub] Update notifications disabled by user setting, skipping changelog and notification');
+				}
+			} else {
+				log(`[GitHub] Changelog for version ${releaseInfo.latestVersion} has already been shown`);
+			}
+		}
+	} catch (error: any) {
+		log(`[GitHub] Error checking for updates: ${error.message}`, true);
+		log(`[GitHub] Error details: ${JSON.stringify({
+			status: error.response?.status,
+			data: error.response?.data,
+			message: error.message
+		})}`, true);
+	}
 }
 
 function showChangelogWebview(release: GitHubRelease, version: string): void {
