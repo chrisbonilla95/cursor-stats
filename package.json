@@ -356,7 +356,7 @@
           },
           "cursorStats.showChangelogOnUpdate": {
             "type": "boolean",
-            "default": false,
+            "default": true,
             "description": "Show changelog popup and update notifications when the extension is updated to a new version.",
             "scope": "window"
           }
