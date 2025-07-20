@@ -108,14 +108,19 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     });
 
-    // Check initial usage-based status
+    // Check initial usage-based status (optional - graceful failure)
     const token = await getCursorTokenFromDB();
     if (token) {
       log('[Initialization] Checking usage-based pricing status...');
-      const status = await checkUsageBasedStatus(token);
-      log(
-        `[Initialization] Usage-based pricing is ${status.isEnabled ? 'enabled' : 'disabled'}${status.limit ? ` with limit $${status.limit}` : ''}`,
-      );
+      try {
+        const status = await checkUsageBasedStatus(token);
+        log(
+          `[Initialization] Usage-based pricing is ${status.isEnabled ? 'enabled' : 'disabled'}${status.limit ? ` with limit $${status.limit}` : ''}`,
+        );
+      } catch (error: any) {
+        log('[Initialization] Usage-based pricing status check failed (non-critical), continuing...', true);
+        log(`[Initialization] Status check error: ${error.message}`, true);
+      }
     }
 
     // Register commands

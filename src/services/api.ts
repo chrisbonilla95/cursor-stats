@@ -6,16 +6,29 @@ import { getExtensionContext } from '../extension';
 import { t } from '../utils/i18n';
 import * as fs from 'fs';
 
+// Common headers that mimic web browser requests to bypass CORS validation
+const getBrowserHeaders = (token: string) => ({
+    'Content-Type': 'application/json',
+    'Cookie': `WorkosCursorSessionToken=${token}`,
+    'Origin': 'https://cursor.com',
+    'Referer': 'https://cursor.com/dashboard',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Dest': 'empty',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': '*/*',
+    'Accept-Language': 'en',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache'
+});
+
 export async function getCurrentUsageLimit(token: string, teamId?: number): Promise<UsageLimitResponse> {
     try {
         const payload = teamId ? { teamId } : {};
         const response = await axios.post('https://cursor.com/api/dashboard/get-hard-limit', 
             payload,
             {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Cookie: `WorkosCursorSessionToken=${token}`
-                }
+                headers: getBrowserHeaders(token)
             }
         );
         return response.data;
@@ -33,10 +46,7 @@ export async function setUsageLimit(token: string, hardLimit: number, noUsageBas
                 noUsageBasedAllowed
             },
             {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Cookie: `WorkosCursorSessionToken=${token}`
-                }
+                headers: getBrowserHeaders(token)
             }
         );
         log(`[API] Successfully ${noUsageBasedAllowed ? 'disabled' : 'enabled'} usage-based pricing with limit: $${hardLimit}`);
@@ -55,10 +65,7 @@ export async function checkUsageBasedStatus(token: string, teamId?: number): Pro
         const response = await axios.post('https://cursor.com/api/dashboard/get-usage-based-premium-requests', 
             payload,
             {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Cookie: `WorkosCursorSessionToken=${token}`
-                }
+                headers: getBrowserHeaders(token)
             }
         );
         
@@ -111,10 +118,7 @@ async function fetchMonthData(token: string, month: number, year: number): Promi
                 year,
                 includeUsageEvents: false
             }, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Cookie: `WorkosCursorSessionToken=${token}`
-                }
+                headers: getBrowserHeaders(token)
             });
         }
         
@@ -321,6 +325,7 @@ export async function fetchCursorStats(token: string): Promise<CursorStats> {
 
         let premiumRequests;
         let isUsingTeamSpend = false;
+        let teamSpendCents: number | undefined = undefined;
         
         if (teamInfo.isTeamMember && teamInfo.teamId && teamInfo.userId) {
             // Use team spend data for team members to get team-specific usage
@@ -328,6 +333,9 @@ export async function fetchCursorStats(token: string): Promise<CursorStats> {
             try {
                 const teamSpend = await getTeamSpend(token, teamInfo.teamId);
                 const userSpend = extractUserSpend(teamSpend, teamInfo.userId);
+                
+                // Store the spendCents value
+                teamSpendCents = userSpend.spendCents || 0;
                 
                 // Get individual usage to get the premium request limit (GPT-4)
                 const individualUsage = await axios.get<CursorUsageResponse>('https://cursor.com/api/usage', {
@@ -352,12 +360,17 @@ export async function fetchCursorStats(token: string): Promise<CursorStats> {
                     usageBasedCurrent: individualUsage.data['gpt-4-32k'].numRequests,
                     hardLimitOverrideDollars: userSpend.hardLimitOverrideDollars,
                     userName: userSpend.name,
+                    spendCents: userSpend.spendCents || 0,
                     usingGPT4Number: true // Log that we're using GPT-4 number
                 });
                 
                 isUsingTeamSpend = true;
             } catch (spendError: any) {
-                log('[API] Team spend failed, falling back to individual usage API: ' + spendError.message, true);
+                log('[API] Team spend failed (likely 403 CORS), falling back to individual usage API: ' + spendError.message, true);
+                // Don't retry team calls if they're failing with 403 - this is likely a CORS/origin issue
+                if (spendError.response?.status === 403) {
+                    log('[API] 403 error detected for team spend, skipping team data for this session', true);
+                }
                 // Fall through to individual API
             }
         }
@@ -387,44 +400,66 @@ export async function fetchCursorStats(token: string): Promise<CursorStats> {
             };
         }
 
-        // Get current date for usage-based pricing (which renews on 2nd/3rd of each month)
+        // Use the same billing cycle for both premium requests and usage-based pricing
+        // since they share the same subscription cycle start date
+        const subscriptionStart = new Date(premiumRequests.startOfMonth);
         const currentDate = new Date();
-        const usageBasedBillingDay = 3; // Assuming it's the 3rd day of the month
-        let usageBasedCurrentMonth = currentDate.getMonth() + 1;
-        let usageBasedCurrentYear = currentDate.getFullYear();
         
-        // If we're in the first few days of the month (before billing date),
-        // consider the previous month as the current billing period
-        if (currentDate.getDate() < usageBasedBillingDay) {
-            usageBasedCurrentMonth = usageBasedCurrentMonth === 1 ? 12 : usageBasedCurrentMonth - 1;
-            if (usageBasedCurrentMonth === 12) {
-                usageBasedCurrentYear--;
-            }
+        // Calculate current and previous billing periods based on actual subscription start
+        let currentPeriodStart = new Date(subscriptionStart);
+        let previousPeriodStart = new Date(subscriptionStart);
+        
+        // Adjust to current billing cycle
+        const monthsSinceStart = (currentDate.getFullYear() - subscriptionStart.getFullYear()) * 12 + 
+                                (currentDate.getMonth() - subscriptionStart.getMonth());
+        
+        currentPeriodStart.setMonth(subscriptionStart.getMonth() + monthsSinceStart);
+        currentPeriodStart.setFullYear(subscriptionStart.getFullYear() + Math.floor((subscriptionStart.getMonth() + monthsSinceStart) / 12));
+        
+        // If current date is before the current period start, use previous period
+        if (currentDate < currentPeriodStart) {
+            currentPeriodStart.setMonth(currentPeriodStart.getMonth() - 1);
+        }
+        
+        // Previous period is one month before current period
+        previousPeriodStart = new Date(currentPeriodStart);
+        previousPeriodStart.setMonth(previousPeriodStart.getMonth() - 1);
+        
+        // Fetch monthly data with graceful fallback for 403 errors
+        let currentMonthData, lastMonthData;
+        try {
+            currentMonthData = await fetchMonthData(token, currentPeriodStart.getMonth() + 1, currentPeriodStart.getFullYear());
+        } catch (error: any) {
+            log(`[API] Current month data failed (likely 403 CORS), using empty data: ${error.message}`, true);
+            currentMonthData = { items: [], hasUnpaidMidMonthInvoice: false, midMonthPayment: 0 };
+        }
+        
+        try {
+            lastMonthData = await fetchMonthData(token, previousPeriodStart.getMonth() + 1, previousPeriodStart.getFullYear());
+        } catch (error: any) {
+            log(`[API] Last month data failed (likely 403 CORS), using empty data: ${error.message}`, true);
+            lastMonthData = { items: [], hasUnpaidMidMonthInvoice: false, midMonthPayment: 0 };
         }
 
-        // Calculate previous month for usage-based pricing
-        const usageBasedLastMonth = usageBasedCurrentMonth === 1 ? 12 : usageBasedCurrentMonth - 1;
-        const usageBasedLastYear = usageBasedCurrentMonth === 1 ? usageBasedCurrentYear - 1 : usageBasedCurrentYear;
-
-        const currentMonthData = await fetchMonthData(token, usageBasedCurrentMonth, usageBasedCurrentYear);
-        const lastMonthData = await fetchMonthData(token, usageBasedLastMonth, usageBasedLastYear);
-
-        log(`[API] Returning stats with teamId: ${teamInfo.teamId}, isTeamSpendData: ${isUsingTeamSpend}`);
+        log(`[API] Using subscription-based billing periods: current ${currentPeriodStart.getMonth() + 1}/${currentPeriodStart.getFullYear()}, previous ${previousPeriodStart.getMonth() + 1}/${previousPeriodStart.getFullYear()}`);
         
         return {
             currentMonth: {
-                month: usageBasedCurrentMonth,
-                year: usageBasedCurrentYear,
+                month: currentPeriodStart.getMonth() + 1,
+                year: currentPeriodStart.getFullYear(),
                 usageBasedPricing: currentMonthData
             },
             lastMonth: {
-                month: usageBasedLastMonth,
-                year: usageBasedLastYear,
+                month: previousPeriodStart.getMonth() + 1,
+                year: previousPeriodStart.getFullYear(),
                 usageBasedPricing: lastMonthData
             },
             premiumRequests,
             isTeamSpendData: isUsingTeamSpend,
-            teamId: teamInfo.teamId
+            teamId: teamInfo.teamId,
+            teamSpendCents: isUsingTeamSpend && teamInfo.isTeamMember && teamInfo.teamId && teamInfo.userId 
+                ? teamSpendCents
+                : undefined
         };
     } catch (error: any) {
         log('[API] Error fetching premium requests: ' + error, true);
