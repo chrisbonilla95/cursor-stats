@@ -37,14 +37,6 @@
 - 🔄 GitHub release updates
 - 🔒 Secure token management
 
-#### 🔜 Upcoming Features
-
-- 📊 Session-based request tracking
-- 📈 Visual analytics dashboard
-- 🎯 Project-specific monitoring
-- 🎨 Enhanced statistics view
-- ⚙️ Advanced customization options
-
 </details>
 <details id="section-screenshots">
 <summary style="cursor: pointer"><h2 style="display: inline">📸 Screenshots</h2></summary>
