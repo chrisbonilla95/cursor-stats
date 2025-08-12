@@ -149,7 +149,17 @@ export async function generateReport(): Promise<{ reportPath: string; success: b
             }, {
                 headers: {
                     'Content-Type': 'application/json',
-                    Cookie: `WorkosCursorSessionToken=${token}`
+                    'Cookie': `WorkosCursorSessionToken=${token}`,
+                    'Origin': 'https://cursor.com',
+                    'Referer': 'https://cursor.com/dashboard',
+                    'Sec-Fetch-Site': 'same-origin',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Sec-Fetch-Dest': 'empty',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': '*/*',
+                    'Accept-Language': 'en',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
                 }
             })
                 .then(response => {
@@ -172,7 +182,17 @@ export async function generateReport(): Promise<{ reportPath: string; success: b
             }, {
                 headers: {
                     'Content-Type': 'application/json',
-                    Cookie: `WorkosCursorSessionToken=${token}`
+                    'Cookie': `WorkosCursorSessionToken=${token}`,
+                    'Origin': 'https://cursor.com',
+                    'Referer': 'https://cursor.com/dashboard',
+                    'Sec-Fetch-Site': 'same-origin',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Sec-Fetch-Dest': 'empty',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': '*/*',
+                    'Accept-Language': 'en',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
                 }
             })
                 .then(response => {

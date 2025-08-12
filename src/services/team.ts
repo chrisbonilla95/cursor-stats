@@ -92,15 +92,28 @@ export async function checkTeamMembership(token: string, context: vscode.Extensi
             status: usageResponse.status
         });
 
+        // Common headers that mimic web browser requests to bypass CORS validation
+        const getBrowserHeaders = (token: string) => ({
+            'Content-Type': 'application/json',
+            'Cookie': `WorkosCursorSessionToken=${token}`,
+            'Origin': 'https://cursor.com',
+            'Referer': 'https://cursor.com/dashboard',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Dest': 'empty',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'en',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+        });
+
         // Fetch team membership data
         log('[Team] Making request to /api/dashboard/teams endpoint');
         const response = await axios.post<TeamInfo>('https://cursor.com/api/dashboard/teams', 
             {}, // empty JSON body
             {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Cookie: `WorkosCursorSessionToken=${token}`
-                }
+                headers: getBrowserHeaders(token)
             }
         );
         
@@ -121,10 +134,7 @@ export async function checkTeamMembership(token: string, context: vscode.Extensi
             const teamResponse = await axios.post<TeamMemberInfo>('https://cursor.com/api/dashboard/team', 
                 { teamId },
                 {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Cookie: `WorkosCursorSessionToken=${token}`
-                    }
+                    headers: getBrowserHeaders(token)
                 }
             );
             teamUserId = teamResponse.data.userId;
@@ -165,14 +175,27 @@ export async function checkTeamMembership(token: string, context: vscode.Extensi
 
 export async function getTeamSpend(token: string, teamId: number): Promise<TeamSpendResponse> {
     try {
+        // Common headers that mimic web browser requests to bypass CORS validation
+        const getBrowserHeaders = (token: string) => ({
+            'Content-Type': 'application/json',
+            'Cookie': `WorkosCursorSessionToken=${token}`,
+            'Origin': 'https://cursor.com',
+            'Referer': 'https://cursor.com/dashboard',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Dest': 'empty',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'en',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+        });
+
         log('[Team] Making request to get team spend');
         const response = await axios.post<TeamSpendResponse>('https://cursor.com/api/dashboard/get-team-spend', 
             { teamId }, // Include teamId in request body
             {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Cookie: `WorkosCursorSessionToken=${token}`
-                }
+                headers: getBrowserHeaders(token)
             }
         );
         log('[Team] Team spend response', {
@@ -214,7 +237,8 @@ export function extractUserSpend(teamSpend: TeamSpendResponse, userId: number) {
         email: userSpend.email,
         role: userSpend.role,
         hardLimitOverrideDollars: userSpend.hardLimitOverrideDollars,
-        fastPremiumRequests: userSpend.fastPremiumRequests || 0
+        fastPremiumRequests: userSpend.fastPremiumRequests || 0,
+        spendCents: userSpend.spendCents || 0
     });
 
     return {
@@ -223,6 +247,7 @@ export function extractUserSpend(teamSpend: TeamSpendResponse, userId: number) {
         email: userSpend.email,
         role: userSpend.role,
         hardLimitOverrideDollars: userSpend.hardLimitOverrideDollars,
-        fastPremiumRequests: userSpend.fastPremiumRequests || 0
+        fastPremiumRequests: userSpend.fastPremiumRequests || 0,
+        spendCents: userSpend.spendCents || 0
     };
 } 
