@@ -1,4 +1,6 @@
 # Cursor Stats
+ # No more maintained 
+ # Due to the constant changes in Cursor's pricing policy, I am no longer using their services. Thank you for your support ❤️
 
 <div align="center">
 
